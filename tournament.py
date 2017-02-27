@@ -6,15 +6,19 @@
 import psycopg2
 
 
-def connect():
+def connect(database_name="tournament"):
     """Connect to the PostgreSQL database.  Returns a database connection."""
-    return psycopg2.connect("dbname=tournament")
-
+    try:
+        db = psycopg2.connect("dbname={}".format(database_name))
+        c = db.cursor()
+        return db, c
+    except:
+        print("Unable to connect to the database")
 
 def deleteMatches():
     """Remove all the match records from the database."""
-    db = connect()
-    c = db.cursor()
+    db, c = connect()
+    c.execute("delete from matches")
     c.execute("update players set matches = 0")
     c.execute("update players set wins = 0")
     db.commit()
@@ -23,8 +27,7 @@ def deleteMatches():
 
 def deletePlayers():
     """Remove all the player records from the database."""
-    db = connect()
-    c = db.cursor()
+    db, c = connect()
     c.execute("delete from players")
     db.commit()
     db.close()
@@ -32,8 +35,7 @@ def deletePlayers():
 
 def countPlayers():
     """Returns the number of players currently registered."""
-    db = connect()
-    c = db.cursor()
+    db, c = connect()
     c.execute("select count(*) from players")
     for row in c.fetchall():
         count = row[0]
@@ -50,8 +52,7 @@ def registerPlayer(name):
     Args:
       name: the player's full name (need not be unique).
     """
-    db = connect()
-    c = db.cursor()
+    db, c = connect()
     c.execute("insert into players (name, wins, matches) values(%s, 0, 0)" , (name,))
     db.commit()
     db.close()
@@ -70,8 +71,7 @@ def playerStandings():
         wins: the number of matches the player has won
         matches: the number of matches the player has played
     """
-    db = connect()
-    c = db.cursor()
+    db, c = connect()
     c.execute("select id, name, wins, matches from players order by wins desc")
     standings = []
     for row in c.fetchall():
@@ -87,8 +87,8 @@ def reportMatch(winner, loser):
       winner:  the id number of the player who won
       loser:  the id number of the player who lost
     """
-    db = connect()
-    c = db.cursor()
+    db, c = connect()
+    c.execute("insert into matches (player1, player2) values(%s,%s)" , (winner,loser))
     c.execute("update players set wins = wins+1 where id = %s" , (winner,))
     c.execute("update players set matches = matches+1 where id = %s" , (winner,))
     c.execute("update players set matches = matches+1 where id = %s" , (loser,))
@@ -111,21 +111,24 @@ def swissPairings():
         id2: the second player's unique id
         name2: the second player's name
     """
-    db = connect()
-    c = db.cursor()
-    c.execute("select id, name from players order by wins desc")
-    match = []
-    player = ()
-    count = 0
-    for row in c.fetchall():
-        player = player + (row)
-        count += 1
-        if count == 2:
-            match.append(player)
-            player = ()
-            count = 0
-
-    db.close()
-    return match
+    db, c = connect()
+    if countPlayers() % 2 != 0:
+        print("You must have an even number of players.")
+        db.close()
+        return;
+    else:
+        c.execute("select id, name from players order by wins desc")
+        match = []
+        player = ()
+        count = 0
+        for row in c.fetchall():
+            player = player + (row)
+            count += 1
+            if count == 2:
+                match.append(player)
+                player = ()
+                count = 0
+        db.close()
+        return match
 
 
